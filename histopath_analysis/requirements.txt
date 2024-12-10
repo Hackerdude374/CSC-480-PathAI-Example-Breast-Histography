@@ -1,0 +1,10 @@
+pip install mlflow
+pip install fastapi uvicorn
+pip install streamlit
+pip install torch torchvision pytorch-lightning
+pip install plotly opencv-python scikit-learn pandas numpy pillow
+pip install hydra-core pytest albumentations
+pip install torch-geometric
+conda install numpy==1.26.4
+conda install pandas
+conda install mlflow
