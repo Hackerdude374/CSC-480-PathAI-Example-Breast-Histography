@@ -8,3 +8,4 @@ pip install torch-geometric
 conda install numpy==1.26.4
 conda install pandas
 conda install mlflow
+pip install scikit-image

@@ -11,6 +11,7 @@ import numpy as np
 from sklearn.metrics import confusion_matrix, classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
+import logging
 
 from src.models.combined_model import CombinedModel
 from src.data.dataset import HistopathologyDataModule
@@ -21,6 +22,10 @@ from src.utils.visualization import (
     plot_prediction_confidence
 )
 
+# Set up logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(name)s:%(message)s')
+logger = logging.getLogger(__name__)
+
 @hydra.main(config_path="../configs", config_name="training_config")
 def evaluate(cfg: DictConfig):
     """
@@ -28,11 +33,16 @@ def evaluate(cfg: DictConfig):
     """
     # Load model from MLflow
     run_id = cfg.evaluation.run_id
-    model = mlflow.pytorch.load_model(
-        f"runs:/{run_id}/model",
-        map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    )
-    model.eval()
+    logger.info(f"Loading model from run ID: {run_id}")
+    try:
+        model = mlflow.pytorch.load_model(
+            f"runs:/{run_id}/model",
+            map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        )
+        model.eval()
+    except Exception as e:
+        logger.error(f"Error loading model: {str(e)}")
+        raise RuntimeError("Failed to load model")
 
     # Initialize data module
     datamodule = HistopathologyDataModule(
@@ -60,11 +70,13 @@ def evaluate(cfg: DictConfig):
                     for k, v in batch.items()}
             
             # Get predictions
+            logger.debug("Forwarding batch through model")
             logits, outputs = model(batch)
             probabilities = torch.softmax(logits, dim=1)
             predictions = torch.argmax(logits, dim=1)
             
             # Update metrics
+            logger.debug("Updating metrics")
             metrics_tracker.update(
                 predictions.cpu(),
                 batch['label'].cpu(),
@@ -86,6 +98,7 @@ def evaluate(cfg: DictConfig):
                 
                 # Save visualizations if configured
                 if cfg.evaluation.save_visualizations:
+                    logger.debug("Saving visualizations")
                     patient_dir = output_dir / 'visualizations' / batch['patient_id'][i]
                     patient_dir.mkdir(parents=True, exist_ok=True)
                     
@@ -107,6 +120,7 @@ def evaluate(cfg: DictConfig):
                     graph_fig.write_html(patient_dir / 'tissue_graph.html')
     
     # Compute and save metrics
+    logger.info("Computing and saving metrics")
     metrics = metrics_tracker.compute_metrics()
     metrics.update(calculate_confidence_metrics(
         np.array([r['probabilities'] for r in results])
@@ -117,6 +131,7 @@ def evaluate(cfg: DictConfig):
         json.dump(metrics, f, indent=4)
     
     # Create and save confusion matrix
+    logger.info("Generating and saving confusion matrix")
     plt.figure(figsize=(10, 8))
     cm = confusion_matrix(
         [r['true_label'] for r in results],
@@ -135,6 +150,7 @@ def evaluate(cfg: DictConfig):
     plt.close()
     
     # Generate classification report
+    logger.info("Generating and saving classification report")
     report = classification_report(
         [r['true_label'] for r in results],
         [r['predicted_label'] for r in results],
@@ -144,6 +160,7 @@ def evaluate(cfg: DictConfig):
     pd.DataFrame(report).to_csv(output_dir / 'classification_report.csv')
     
     # Create confidence distribution plot
+    logger.info("Generating and saving confidence distribution plot")
     plt.figure(figsize=(10, 6))
     sns.histplot(
         data=pd.DataFrame(results),
@@ -157,9 +174,11 @@ def evaluate(cfg: DictConfig):
     plt.close()
     
     # Save detailed results
+    logger.info("Saving detailed results")
     pd.DataFrame(results).to_csv(output_dir / 'detailed_results.csv', index=False)
     
     # Log results to MLflow
+    logger.info("Logging results to MLflow")
     with mlflow.start_run(run_id=run_id):
         mlflow.log_metrics(metrics)
         mlflow.log_artifacts(str(output_dir))

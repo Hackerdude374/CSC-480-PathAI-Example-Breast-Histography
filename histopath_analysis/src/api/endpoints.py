@@ -14,7 +14,7 @@ from ..data.preprocessing import extract_patches, create_tissue_graph
 from ..utils.visualization import create_attention_heatmap
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(name)s:%(message)s')
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -42,28 +42,35 @@ class ModelService:
     def load_model(self):
         try:
             # Load model from MLflow
+            print("Loading model from MLflow...")
             logged_model = mlflow.pytorch.load_model(
                 f"runs:/latest/model",
                 map_location=self.device
             )
             self.model = logged_model.eval()
-            logger.info(f"Model loaded successfully on {self.device}")
+            logging.info(f"Model loaded successfully on {self.device}")
+            print("Model loaded successfully.")
         except Exception as e:
-            logger.error(f"Error loading model: {str(e)}")
+            logging.error(f"Error loading model: {str(e)}")
+            self.model = None
+            print(f"Error loading model: {str(e)}")
             raise RuntimeError("Failed to load model")
 
     async def process_image(self, image: Image.Image) -> Dict:
         """Process a single image"""
         try:
             # Extract patches
+            print("Extracting patches from image...")
             patches = extract_patches(image, num_patches=100)
             
             # Transform patches
+            print("Transforming patches...")
             patch_tensors = torch.stack([
                 self.transform(patch) for patch in patches
             ]).unsqueeze(0)
             
             # Create tissue graph
+            print("Creating tissue graph...")
             graph = create_tissue_graph(patch_tensors[0])
             
             # Prepare input batch
@@ -73,11 +80,13 @@ class ModelService:
             }
             
             # Get predictions
+            print("Getting predictions from model...")
             with torch.no_grad():
                 logits, outputs = self.model(batch)
                 probabilities = torch.softmax(logits, dim=1)
                 
             # Create attention heatmap
+            print("Creating attention heatmap...")
             heatmap = create_attention_heatmap(
                 image,
                 outputs['mil_attention'][0],
@@ -93,6 +102,7 @@ class ModelService:
             
         except Exception as e:
             logger.error(f"Error processing image: {str(e)}")
+            print(f"Error processing image: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Error processing image: {str(e)}"
@@ -120,10 +130,12 @@ async def predict(file: UploadFile = File(...)) -> Dict:
             )
         
         # Read image
+        print("Reading image file...")
         contents = await file.read()
         image = Image.open(io.BytesIO(contents)).convert('RGB')
         
         # Process image
+        print("Processing image...")
         results = await model_service.process_image(image)
         
         return {
@@ -145,6 +157,7 @@ async def predict(file: UploadFile = File(...)) -> Dict:
         
     except Exception as e:
         logger.error(f"Prediction error: {str(e)}")
+        print(f"Prediction error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/batch-predict")
@@ -161,6 +174,7 @@ async def batch_predict(files: List[UploadFile] = File(...)) -> Dict:
     results = []
     for file in files:
         try:
+            print(f"Processing file: {file.filename}")
             result = await predict(file)
             results.append({
                 'filename': file.filename,
