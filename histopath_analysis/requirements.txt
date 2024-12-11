@@ -9,3 +9,6 @@ conda install numpy==1.26.4
 conda install pandas
 conda install mlflow
 pip install scikit-image
+pip install torch
+
+pip install python-multipart
