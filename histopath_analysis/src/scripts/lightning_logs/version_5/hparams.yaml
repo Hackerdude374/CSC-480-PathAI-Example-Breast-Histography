@@ -1,4 +1,0 @@
-num_classes: 2
-mil_feature_dim: 512
-gnn_hidden_dim: 256
-learning_rate: 0.0001
