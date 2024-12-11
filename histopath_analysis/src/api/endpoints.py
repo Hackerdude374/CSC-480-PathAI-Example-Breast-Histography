@@ -147,3 +147,23 @@ async def get_model_info() -> Dict:
         'device': str(model_service.device),
         'status': 'Test mode - No model loaded'
     }
+    
+    
+
+
+@app.post("/batch-predict")
+async def batch_predict(files: List[UploadFile] = File(...)) -> Dict:
+    results = []
+    for file in files:
+        try:
+            result = await predict(file)
+            results.append({
+                'filename': file.filename,
+                'predictions': result
+            })
+        except Exception as e:
+            results.append({
+                'filename': file.filename,
+                'error': str(e)
+            })
+    return {'results': results}

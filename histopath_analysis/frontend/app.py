@@ -35,7 +35,7 @@ class HistopathologyApp:
         self.API_URL = "http://localhost:8000"
         
     def main(self):
-        st.title("🔬 Histopathology Image Analysis")
+        st.title("🔬 Histopathology Image Analysis: by Robert Le, Ashwin Anil, Justin Thomas")
         
         # Sidebar
         self.setup_sidebar()
