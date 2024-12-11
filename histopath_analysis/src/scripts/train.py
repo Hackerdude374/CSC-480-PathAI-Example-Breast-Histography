@@ -40,7 +40,7 @@ def train():
 
     logger.info(f"Train dataset size: {len(train_dataset)}")
     logger.info(f"Validation dataset size: {len(val_dataset)}")
-    
+
 
     # Initialize datasets
     train_dataset = HistopathologyDataset(
@@ -83,7 +83,8 @@ def train():
 
     # Setup training
     trainer = pl.Trainer(
-        max_epochs=10,
+        #max_epochs=10,#too long currently, another time
+        max_epochs=2,
         accelerator='auto',
         devices=1,
         log_every_n_steps=10,
@@ -132,6 +133,9 @@ def train():
         json.dump(metadata, f, indent=4)
     
     logger.info(f"Training metadata saved to {metadata_file}")
-
+    # Save the trained model
+    logger.info("Saving trained model...")
+    torch.save(model.state_dict(), r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\data\model.pth")
+    logger.info("Model saved.")
 if __name__ == "__main__":
     train()
