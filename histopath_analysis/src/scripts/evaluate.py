@@ -1,5 +1,4 @@
 import pytorch_lightning as pl
-import mlflow
 import hydra
 from omegaconf import DictConfig
 import pandas as pd
@@ -26,19 +25,18 @@ from src.utils.visualization import (
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(name)s:%(message)s')
 logger = logging.getLogger(__name__)
 
-@hydra.main(config_path="../configs", config_name="training_config")
-def evaluate(cfg: DictConfig):
+def evaluate(
+    model_checkpoint_path: str,
+    test_data_dir: str,
+    output_dir: Path
+):
     """
     Evaluate trained model on test dataset
     """
-    # Load model from MLflow
-    run_id = cfg.evaluation.run_id
-    logger.info(f"Loading model from run ID: {run_id}")
+    # Load model from checkpoint
+    logger.info(f"Loading model from: {model_checkpoint_path}")
     try:
-        model = mlflow.pytorch.load_model(
-            f"runs:/{run_id}/model",
-            map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        )
+        model = CombinedModel.load_from_checkpoint(model_checkpoint_path)
         model.eval()
     except Exception as e:
         logger.error(f"Error loading model: {str(e)}")
@@ -46,11 +44,11 @@ def evaluate(cfg: DictConfig):
 
     # Initialize data module
     datamodule = HistopathologyDataModule(
-        data_dir=cfg.data.test_path,
-        batch_size=cfg.evaluation.batch_size,
-        num_workers=cfg.training.num_workers,
-        patch_size=cfg.data.patch_size,
-        num_patches=cfg.data.num_patches
+        data_dir=test_data_dir,
+        batch_size=32,
+        num_workers=4,
+        patch_size=50,
+        num_patches=100
     )
     datamodule.setup('test')
 
@@ -58,7 +56,6 @@ def evaluate(cfg: DictConfig):
     metrics_tracker = MetricsTracker()
     
     # Create output directory
-    output_dir = Path(cfg.evaluation.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Evaluate model
@@ -227,6 +224,11 @@ def analyze_failures(results_df: pd.DataFrame, output_dir: Path):
     # Save error analysis
     with open(output_dir / 'error_analysis.json', 'w') as f:
         json.dump(error_analysis, f, indent=4)
-
+        
+        
 if __name__ == "__main__":
-    evaluate()
+    evaluate(
+        model_checkpoint_path="histopath_analysis/models/latest.ckpt",
+        test_data_dir="histopath_analysis/src/data/processed/test",
+        output_dir=Path("histopath_analysis/evaluation")
+    )
