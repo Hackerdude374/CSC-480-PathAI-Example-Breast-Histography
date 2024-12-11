@@ -21,8 +21,8 @@ class CombinedModel(pl.LightningModule):
         # Initialize sub-models
         self.mil_model = MILModel(num_classes=num_classes)
         self.gnn_model = GNNModel(
-            in_channels=mil_feature_dim,
-            hidden_channels=gnn_hidden_dim,
+            in_channels=4,  # Change from 512 to 4
+            hidden_channels=256,
             num_classes=num_classes
         )
         

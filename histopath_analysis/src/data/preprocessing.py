@@ -82,12 +82,13 @@ def _is_tissue_patch(patch: Image.Image, threshold: float = 0.1) -> bool:
     gray = cv2.cvtColor(np.array(patch), cv2.COLOR_RGB2GRAY)
     return np.mean(gray < 220) > threshold
 
+
 def create_tissue_graph(patches: torch.Tensor) -> Data:
     """Create a graph from tissue patches using nuclei detection"""
     # Convert patches to numpy for OpenCV processing
     patches_np = patches.permute(0, 2, 3, 1).numpy()
     
-    # Detect nuclei centers as nodes
+    # Initialize lists for storing features and positions
     node_features = []
     node_positions = []
     
@@ -118,10 +119,19 @@ def create_tissue_graph(patches: torch.Tensor) -> Data:
             ])
             node_features.append(features)
             node_positions.append([x, y])
+
+    # If no nodes were detected, create a dummy node
+    if len(node_features) == 0:
+        node_features = [[0.0] * 4]  # 3 color channels + 1 intensity
+        node_positions = [[0.0, 0.0]]
+
+    # Convert lists to numpy arrays first, then to tensors
+    node_features = np.array(node_features, dtype=np.float32)
+    node_positions = np.array(node_positions, dtype=np.float32)
     
     # Convert to tensors
-    node_features = torch.tensor(node_features, dtype=torch.float)
-    node_positions = torch.tensor(node_positions, dtype=torch.float)
+    node_features = torch.from_numpy(node_features)
+    node_positions = torch.from_numpy(node_positions)
     
     # Create edges using Delaunay triangulation
     if len(node_positions) > 3:

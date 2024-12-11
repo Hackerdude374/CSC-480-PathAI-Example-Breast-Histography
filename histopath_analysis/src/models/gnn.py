@@ -39,7 +39,7 @@ class GNNModel(pl.LightningModule):
         for conv in self.convs[:-1]:
             x = conv(x, edge_index)
             x = torch.relu(x)
-            x = torch.dropout(x, p=0.5, training=self.training)
+            x = torch.nn.functional.dropout(x, p=0.5, training=self.training)
             
         x = self.convs[-1](x, edge_index)
         
