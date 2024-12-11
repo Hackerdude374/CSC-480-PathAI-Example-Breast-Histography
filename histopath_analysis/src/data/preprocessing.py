@@ -7,6 +7,41 @@ import cv2
 from skimage.feature import peak_local_max
 from scipy.spatial import Delaunay
 
+# def extract_patches(
+#     image: Image.Image,
+#     patch_size: int = 50,
+#     num_patches: int = 100,
+#     overlap: float = 0.5
+# ) -> List[Image.Image]:
+#     """Extract patches from whole slide image"""
+#     width, height = image.size
+#     stride = int(patch_size * (1 - overlap))
+    
+#     # Get all possible patch coordinates
+#     x_coords = range(0, width - patch_size + 1, stride)
+#     y_coords = range(0, height - patch_size + 1, stride)
+    
+#     patches = []
+#     for x in x_coords:
+#         for y in y_coords:
+#             patch = image.crop((x, y, x + patch_size, y + patch_size))
+#             if _is_tissue_patch(patch):
+#                 patches.append(patch)
+    
+#     # Random sample if we have more patches than needed
+#     if len(patches) > num_patches:
+#         indices = np.random.choice(
+#             len(patches),
+#             num_patches,
+#             replace=False
+#         )
+#         patches = [patches[i] for i in indices]
+    
+#     # Pad with empty patches if we have too few
+#     while len(patches) < num_patches:
+#         patches.append(Image.fromarray(np.zeros((patch_size, patch_size, 3))))
+    
+#     return patches
 def extract_patches(
     image: Image.Image,
     patch_size: int = 50,
@@ -30,18 +65,17 @@ def extract_patches(
     
     # Random sample if we have more patches than needed
     if len(patches) > num_patches:
-        indices = np.random.choice(
-            len(patches),
-            num_patches,
-            replace=False
-        )
+        indices = np.random.choice(len(patches), num_patches, replace=False)
         patches = [patches[i] for i in indices]
     
     # Pad with empty patches if we have too few
     while len(patches) < num_patches:
-        patches.append(Image.fromarray(np.zeros((patch_size, patch_size, 3))))
+        # Create empty patch with correct data type
+        empty_patch = np.zeros((patch_size, patch_size, 3), dtype=np.uint8)  # Change to uint8
+        patches.append(Image.fromarray(empty_patch))
     
     return patches
+
 
 def _is_tissue_patch(patch: Image.Image, threshold: float = 0.1) -> bool:
     """Check if patch contains tissue (not background)"""
