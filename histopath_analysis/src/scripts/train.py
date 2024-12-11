@@ -41,7 +41,6 @@ def train():
     logger.info(f"Train dataset size: {len(train_dataset)}")
     logger.info(f"Validation dataset size: {len(val_dataset)}")
 
-
     # Initialize datasets
     train_dataset = HistopathologyDataset(
         data_dir=str(train_path),
@@ -83,7 +82,6 @@ def train():
 
     # Setup training
     trainer = pl.Trainer(
-        #max_epochs=10,#too long currently, another time
         max_epochs=2,
         accelerator='auto',
         devices=1,
@@ -103,9 +101,12 @@ def train():
         ]
     )
 
-    # Train
-    logger.info("Starting model training...")
-    trainer.fit(model, train_loader, val_loader)
+    try:
+        # Train
+        logger.info("Starting model training...")
+        trainer.fit(model, train_loader, val_loader)
+    except KeyboardInterrupt:
+        logger.info("Training interrupted by the user.")
 
     # Create models directory
     models_dir = project_root / "models"
@@ -126,16 +127,15 @@ def train():
         'val_acc': trainer.callback_metrics.get('val_acc', float('nan'))
     }
     
-    # Save metadata to file
     metadata_file = models_dir / "training_metadata.json"
-    import json
     with open(metadata_file, 'w') as f:
         json.dump(metadata, f, indent=4)
     
     logger.info(f"Training metadata saved to {metadata_file}")
     # Save the trained model
     logger.info("Saving trained model...")
-    torch.save(model.state_dict(), r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\data\model.pth")
+    torch.save(model.state_dict(), r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\data\finishedmodel")
     logger.info("Model saved.")
+
 if __name__ == "__main__":
     train()
