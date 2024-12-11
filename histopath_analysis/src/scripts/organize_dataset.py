@@ -76,3 +76,14 @@ def organize_dataset(
 
 if __name__ == "__main__":
     organize_dataset()
+    
+# Dataset organization complete.
+
+# Train split:
+#   Number of patients: 195
+
+# Val split:
+#   Number of patients: 41
+
+# Test split:
+#   Number of patients: 43
