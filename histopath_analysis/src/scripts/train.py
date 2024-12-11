@@ -1,56 +1,84 @@
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
+import torch
+from torch.utils.data import DataLoader
+import mlflow.pytorch
+from pathlib import Path
+import logging
+
 import sys
 from pathlib import Path
+# Add project root to Python path
+sys.path.append(str(Path(__file__).parents[2]))
 
-# Add the src directory to the Python path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+# Now imports will work
+from src.data.dataset import HistopathologyDataset
+from src.models.combined_model import CombinedModel
 
-# Import modules
-from data.dataset import HistopathologyDataModule
-from models.combined_model import CombinedModel
-from utils.metrics import MetricsTracker
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+def train():
+    logger.info("Starting training...")
 
-def train(
-    train_data_dir: str,
-    val_data_dir: str,
-    test_data_dir: str,
-    model_checkpoint_path: str
-):
-    # Setup data
-    data_module = HistopathologyDataModule(
-        data_dir=train_data_dir,
-        val_data_dir=val_data_dir,
-        test_data_dir=test_data_dir,
+    # Initialize datasets
+    train_dataset = HistopathologyDataset(
+        data_dir=r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\data\processed\train",
+        mode='train'
+    )
+    val_dataset = HistopathologyDataset(
+        data_dir=r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\data\processed\val",
+        mode='val'
+    )
+
+    logger.info(f"Train dataset size: {len(train_dataset)}")
+    logger.info(f"Val dataset size: {len(val_dataset)}")
+
+    # Create data loaders
+    train_loader = DataLoader(
+        train_dataset,
         batch_size=32,
-        num_workers=4,
-        patch_size=50,
-        num_patches=100
+        shuffle=True,
+        num_workers=4
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=32,
+        shuffle=False,
+        num_workers=4
     )
 
     # Initialize model
     model = CombinedModel()
+    logger.info("Model initialized")
 
-    # Training
-    checkpoint_callback = ModelCheckpoint(
-        dirpath=Path(model_checkpoint_path).parent,
-        filename=Path(model_checkpoint_path).stem
+    # Setup training
+    trainer = pl.Trainer(
+        max_epochs=10,
+        accelerator='auto',  # Uses GPU if available
+        devices=1,
+        log_every_n_steps=10,
+        callbacks=[
+            pl.callbacks.ModelCheckpoint(
+                dirpath="checkpoints",
+                filename="model-{epoch:02d}-{val_loss:.2f}",
+                save_top_k=3,
+                monitor="val_loss"
+            ),
+            pl.callbacks.EarlyStopping(
+                monitor="val_loss",
+                patience=3
+            )
+        ]
     )
-    trainer = pl.Trainer(max_epochs=10, callbacks=[checkpoint_callback])
-    trainer.fit(model, data_module)
 
-    # Evaluate model on test set
-    evaluate(
-        model_checkpoint_path=model_checkpoint_path,
-        test_data_dir=test_data_dir,
-        output_dir=Path(model_checkpoint_path).parent / "evaluation"
-    )
+    # Train
+    logger.info("Starting model training...")
+    trainer.fit(model, train_loader, val_loader)
+
+    # Save model with MLflow
+    logger.info("Saving model...")
+    mlflow.pytorch.save_model(model, "models/latest")
+    logger.info("Training complete!")
 
 if __name__ == "__main__":
-    train(
-        train_data_dir="histopath_analysis/src/data/processed/train",
-        val_data_dir="histopath_analysis/src/data/processed/val",
-        test_data_dir="histopath_analysis/src/data/processed/test",
-        model_checkpoint_path="histopath_analysis/models/latest.ckpt"
-    )
+    train()
