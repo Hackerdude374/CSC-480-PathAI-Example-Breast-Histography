@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 import mlflow.pytorch
 import logging
 from torch_geometric.data import Batch
-
+from torch.utils.data import Subset
 from src.data.dataset import HistopathologyDataset
 from src.models.combined_model import CombinedModel
 
@@ -35,21 +35,27 @@ def train():
     val_path = r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\data\processed\val"
     print(f"Train Path: {train_path}")
     print(f"Validation Path: {val_path}")
-    train_dataset = HistopathologyDataset(data_dir=str(train_path), mode='train')
-    val_dataset = HistopathologyDataset(data_dir=str(val_path), mode='val')
+    
+# Load full datasets
+    train_dataset_full = HistopathologyDataset(data_dir=str(train_path), mode='train')
+    val_dataset_full = HistopathologyDataset(data_dir=str(val_path), mode='val')
+
+    # Use a subset of the datasets
+    train_dataset = Subset(train_dataset_full, range(50))  # First 50 samples
+    val_dataset = Subset(val_dataset_full, range(50))  # First 50 samples for validation
 
     logger.info(f"Train dataset size: {len(train_dataset)}")
     logger.info(f"Validation dataset size: {len(val_dataset)}")
 
-    # Initialize datasets
-    train_dataset = HistopathologyDataset(
-        data_dir=str(train_path),
-        mode='train'
-    )
-    val_dataset = HistopathologyDataset(
-        data_dir=str(val_path),
-        mode='val'
-    )
+    # # Initialize datasets
+    # train_dataset = HistopathologyDataset(
+    #     data_dir=str(train_path),
+    #     mode='train'
+    # )
+    # val_dataset = HistopathologyDataset(
+    #     data_dir=str(val_path),
+    #     mode='val'
+    # )
 
     logger.info(f"Train dataset size: {len(train_dataset)}")
     logger.info(f"Val dataset size: {len(val_dataset)}")
@@ -76,66 +82,51 @@ def train():
     model = CombinedModel()
     logger.info("Model initialized")
 
-    # Create checkpoint directory
-    checkpoint_dir = project_root / "checkpoints"
-    checkpoint_dir.mkdir(exist_ok=True)
-
-    # Setup training
-    trainer = pl.Trainer(
-        max_epochs=2,
-        accelerator='auto',
-        devices=1,
-        log_every_n_steps=10,
-        callbacks=[
-            pl.callbacks.ModelCheckpoint(
-                dirpath=str(checkpoint_dir),
-                filename="model-{epoch:02d}-{val_loss:.2f}",
-                save_top_k=3,
-                monitor="val_loss"
-            ),
-            pl.callbacks.EarlyStopping(
-                monitor="val_loss",
-                patience=3,
-                mode="min"
-            )
-        ]
-    )
-
     try:
         # Train
-        logger.info("Starting model training...")
+        print("Starting model training...")
+        trainer = pl.Trainer(
+            max_epochs=2,
+            accelerator='auto',
+            devices=1,
+            log_every_n_steps=10
+        )
         trainer.fit(model, train_loader, val_loader)
     except KeyboardInterrupt:
-        logger.info("Training interrupted by the user.")
+        print("Training interrupted by the user.")
 
-    # Create models directory
-    models_dir = project_root / "models"
-    models_dir.mkdir(exist_ok=True)
+        # Save the trained model
+        print("Saving interrupted model...")
+        torch.save(
+            model.state_dict(),
+            r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\data\model.pth"
+        )
+        print("Interrupted model saved successfully.")
 
-    # Save model with MLflow
-    logger.info("Saving model...")
-    mlflow.pytorch.save_model(model, str(models_dir / "latest"))
-    logger.info("Training complete!")
+        # Save the model with MLflow
+        print("Saving interrupted MLflow model...")
+        mlflow.pytorch.save_model(
+            model,
+            r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\models"
+        )
+        print("Interrupted MLflow model saved successfully.")
 
-    # Save training metadata
-    metadata = {
-        'train_size': len(train_dataset),
-        'val_size': len(val_dataset),
-        'epochs': trainer.current_epoch,
-        'train_loss': trainer.callback_metrics.get('train_loss', float('nan')),
-        'val_loss': trainer.callback_metrics.get('val_loss', float('nan')),
-        'val_acc': trainer.callback_metrics.get('val_acc', float('nan'))
-    }
-    
-    metadata_file = models_dir / "training_metadata.json"
-    with open(metadata_file, 'w') as f:
-        json.dump(metadata, f, indent=4)
-    
-    logger.info(f"Training metadata saved to {metadata_file}")
-    # Save the trained model
-    logger.info("Saving trained model...")
-    torch.save(model.state_dict(), r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\data\finishedmodel")
-    logger.info("Model saved.")
+        return  # Exit after saving on interruption
+
+    # Save after successful training
+    print("Saving MLflow model after training...")
+    mlflow.pytorch.save_model(
+        model,
+        r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\models"
+    )
+    print("MLflow model saved successfully.")
+
+    print("Saving final state dictionary...")
+    torch.save(
+        model.state_dict(),
+        r"C:\GITHUB PROJECTS DO HERE C\CSC 480 AI PAthAI CODE PROJECT\CSC-480-PathAI-Example-Breast-Histography\histopath_analysis\src\data\model.pth"
+    )
+    print("State dictionary saved successfully.")
 
 if __name__ == "__main__":
     train()
